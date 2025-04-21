@@ -40,7 +40,7 @@
   storageBucket: "github-survey.firebasestorage.app",
   messagingSenderId: "736836641989",
   appId: "1:736836641989:web:5fab88b6fc1dd0f519fcac",
-  measurementId: "G-C4VC9BN0P7"   
+  //measurementId: "G-C4VC9BN0P7"   
         };
 
         // Firebase の初期化
@@ -48,6 +48,22 @@
         
         // データベース参照を取得
         const database = firebase.database();
+
+         // 修改表单提交处理函数
+       document.getElementById('surveyForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    // 收集表单数据
+    const formData = {
+      name: document.getElementById('name').value,
+      email: document.getElementById('email').value,
+      age: document.getElementById('age').value,
+      usage: document.querySelector('input[name="usage"]:checked').value,
+      usability: document.querySelector('input[name="usability"]:checked').value,
+      likes: document.getElementById('likes').value,
+      improvements: document.getElementById('improvements').value,
+      timestamp: new Date().toISOStri
+        
 
         // 确保jsPsych-html-keyboard-response插件已加载
         if (typeof jsPsychHtmlKeyboardResponse === 'undefined') {
