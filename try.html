@@ -3,149 +3,117 @@
 <head>
   <meta charset="UTF-8">
   <title>ストループ課題</title>
-  <script src="https://unpkg.com/jspsych@7.3.0"></script>
-  <script src="https://unpkg.com/@jspsych/plugin-html-keyboard-response@1.1.2"></script>
+  <!-- jsPsych -->
+  <script src="https://unpkg.com/jspsych@7.3.0" defer></script>
+  <script src="https://unpkg.com/@jspsych/plugin-html-keyboard-response@1.1.2" defer></script>
   <link href="https://unpkg.com/jspsych@7.3.0/css/jspsych.css" rel="stylesheet" />
   <style>
-    body { font-family: Arial, sans-serif; text-align: center; margin: 2em; }
-    #jspsych-target { margin-top: 30px; }
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      margin: 2em;
+    }
+    #jspsych-target {
+      margin-top: 30px;
+    }
   </style>
 </head>
 <body>
-  <div id="jspsych-target">読み込み中...</div>
+  <div id="jspsych-target"></div>
 
-  <!-- Firebase SDK -->
-  <script src="https://www.gstatic.com/firebasejs/10.5.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.5.0/firebase-database-compat.js"></script>
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/10.5.0/firebase-app-compat.js" defer></script>
+  <script src="https://www.gstatic.com/firebasejs/10.5.0/firebase-database-compat.js" defer></script>
 
-  <script>
-    document.addEventListener('DOMContentLoaded', async function () {
-      try {
-        // ✅ Firebase 設定（← 自分のプロジェクトの情報に置き換えてください）
-        const firebaseConfig = {
-          apiKey: "AIzaSyDnZtQ02sSWCajHWkAgoik1JEIUfxP011A",
-          authDomain: "github-survey.firebaseapp.com",
-          databaseURL: "https://github-survey-default-rtdb.firebaseio.com",
-          projectId: "github-survey",
-          storageBucket: "github-survey.appspot.com",
-          messagingSenderId: "736836641989",
-          appId: "1:736836641989:web:5fab88b6fc1dd0f519fcac"
-        };
+  <script defer>
+    window.onload = function () {
+      // ✅ Firebase 設定（あなたのプロジェクト情報に置き換えてください）
+      const firebaseConfig = {
+        apiKey: "AIzaSyDnZtQ02sSWCajHWkAgoik1JEIUfxP011A",
+        authDomain: "github-survey.firebaseapp.com",
+        databaseURL: "https://github-survey-default-rtdb.firebaseio.com",
+        projectId: "github-survey",
+        storageBucket: "github-survey.appspot.com",
+        messagingSenderId: "736836641989",
+        appId: "1:736836641989:web:5fab88b6fc1dd0f519fcac"
+      };
 
-        firebase.initializeApp(firebaseConfig);
-        const database = firebase.database();
+      firebase.initializeApp(firebaseConfig);
+      const database = firebase.database();
 
-        // ✅ 参加者ID生成
-        const participantID = jsPsych.randomization.randomID(8);
+      const jsPsych = initJsPsych({
+        display_element: 'jspsych-target',
+        on_finish: function () {
+          const filteredData = jsPsych.data.get().filter({trial_type: 'html-keyboard-response'}).values();
 
-        // ✅ 既参加チェック関数
-        async function checkDuplicateSubmission(participant_id) {
-          const snapshot = await database.ref('stroop_results').once('value');
-          const data = snapshot.val();
-          if (!data) return false;
+          const results = filteredData.map(trial => ({
+            participant_id: trial.participant_id || null,
+            word: trial.word || null,
+            color: trial.color || null,
+            congruent: trial.congruent || null,
+            rt: trial.rt || null,
+            key_press: trial.key_press || null
+          }));
 
-          for (let key in data) {
-            const session = data[key];
-            if (Array.isArray(session) && session.length > 0 && session[0].participant_id === participant_id) {
-              return true;
-            }
+          if (results.length > 0) {
+            const ref = database.ref('stroop_results').push();
+            ref.set(results)
+              .then(() => console.log("データが保存されました"))
+              .catch((err) => console.error("保存エラー:", err));
           }
-          return false;
+
+          jsPsych.data.displayData(); // デバッグ用
         }
+      });
 
-        // ✅ jsPsych 初期化
-        const jsPsych = initJsPsych({
-          display_element: 'jspsych-target',
-          on_finish: async function () {
-            const filteredData = jsPsych.data.get().filter({ trial_type: 'html-keyboard-response' }).values();
+      const participantID = jsPsych.randomization.randomID(8);
+      const timeline = [];
 
-            const results = filteredData.map(trial => ({
-              participant_id: trial.participant_id || participantID,
-              word: trial.word || null,
-              color: trial.color || null,
-              congruent: trial.congruent || null,
-              rt: trial.rt || null,
-              key_press: trial.key_press ?? null
-            }));
+      // 最初の指示
+      timeline.push({
+        type: jsPsychHtmlKeyboardResponse,
+        stimulus: 'ストループ課題へようこそ。<br><br>スペースキーで開始します。',
+        choices: [' ']
+      });
 
-            if (results.length > 0) {
-              try {
-                const stroopRef = database.ref('stroop_results');
-                await stroopRef.push(results);
+      // 単語と色の設定
+      const words = ['赤', '青', '緑'];
+      const colors = ['red', 'blue', 'green'];
+      const colorMap = { red: '赤', blue: '青', green: '緑' };
 
-                // ✅ 美しい終了ページ
-                document.getElementById('jspsych-target').innerHTML = `
-                  <h2>ご協力ありがとうございました！</h2>
-                  <p>データは正常に送信されました。</p>
-                  <p>この画面を閉じて終了してください。</p>
-                `;
-              } catch (error) {
-                document.getElementById('jspsych-target').innerHTML = `<p style="color:red;">データ送信エラー: ${error.message}</p>`;
-              }
-            } else {
-              document.getElementById('jspsych-target').innerHTML = `<p>保存するデータが見つかりませんでした。</p>`;
-            }
-          }
-        });
-
-        // ✅ 実験タイムライン定義
-        const timeline = [];
-
-        timeline.push({
-          type: jsPsychHtmlKeyboardResponse,
-          stimulus: 'ストループ課題へようこそ。<br><br>スペースキーを押して開始します。',
-          choices: [' ']
-        });
-
-        const words = ['赤', '青', '緑'];
-        const colors = ['red', 'blue', 'green'];
-        const getJapaneseColorName = color => ({ red: '赤', blue: '青', green: '緑' })[color];
-
-        let trials = [];
-        for (let rep = 0; rep < 2; rep++) {
-          for (let word of words) {
-            for (let color of colors) {
-              trials.push({
-                type: jsPsychHtmlKeyboardResponse,
-                stimulus: `<p style="font-size:48px; color:${color};">${word}</p>`,
-                choices: ['r', 'g', 'b'],
-                data: {
-                  participant_id: participantID,
-                  word: word,
-                  color: color,
-                  congruent: word === getJapaneseColorName(color) ? 'congruent' : 'incongruent'
-                },
-                trial_duration: 2000
-              });
-            }
+      // 試行作成
+      let trials = [];
+      for (let rep = 0; rep < 2; rep++) {
+        for (let word of words) {
+          for (let color of colors) {
+            trials.push({
+              type: jsPsychHtmlKeyboardResponse,
+              stimulus: `<p style="font-size:48px; color:${color};">${word}</p>`,
+              choices: ['r', 'g', 'b'],
+              data: {
+                participant_id: participantID,
+                word: word,
+                color: color,
+                congruent: word === colorMap[color] ? 'congruent' : 'incongruent'
+              },
+              trial_duration: 2000
+            });
           }
         }
-
-        timeline.push(...jsPsych.randomization.shuffle(trials));
-
-        timeline.push({
-          type: jsPsychHtmlKeyboardResponse,
-          stimulus: '終了しました。ご協力ありがとうございました。',
-          choices: 'NO_KEYS',
-          trial_duration: 2000
-        });
-
-        // ✅ 重複参加チェック → 実験開始
-        const isDuplicate = await checkDuplicateSubmission(participantID);
-        if (isDuplicate) {
-          document.getElementById('jspsych-target').innerHTML = `
-            <h2>この実験にはすでに参加済みです。</h2>
-            <p>ご協力ありがとうございました。</p>
-          `;
-        } else {
-          jsPsych.run(timeline);
-        }
-
-      } catch (error) {
-        console.error("初期化エラー:", error);
-        document.getElementById('jspsych-target').innerHTML = `<p style="color:red;">エラー: ${error.message}</p>`;
       }
-    });
+
+      timeline.push(...jsPsych.randomization.shuffle(trials));
+
+      timeline.push({
+        type: jsPsychHtmlKeyboardResponse,
+        stimulus: '終了しました。ご協力ありがとうございました。',
+        choices: 'NO_KEYS',
+        trial_duration: 2000
+      });
+
+      // 実験開始
+      jsPsych.run(timeline);
+    };
   </script>
 </body>
 </html>
