@@ -11,6 +11,7 @@
     #jspsych-target { margin-top: 30px; }
     .intro-page { font-size: 18px; margin-top: 20px; }
     .btn-start { padding: 10px 20px; font-size: 18px; cursor: pointer; background-color: #4CAF50; color: white; border: none; border-radius: 5px; }
+    .btn-start:disabled { background-color: #ccc; cursor: not-allowed; }
   </style>
 </head>
 <body>
@@ -23,7 +24,7 @@
 
     <form id="consent-form">
       <label>
-        <input type="checkbox" id="consent-checkbox" required>
+        <input type="checkbox" id="consent-checkbox">
         私はこの実験に参加し、提供された情報が収集されることに同意します。
       </label>
       <br><br>
@@ -31,7 +32,7 @@
     </form>
   </div>
 
-  <!-- jsPsych 实验 -->
+  <!-- jsPsych 実験 -->
   <div id="jspsych-target" style="display:none;"></div>
 
   <!-- Firebase SDK -->
@@ -40,12 +41,19 @@
 
   <script>
     // 初期化部分：等待用户同意后启动实验
+    document.getElementById('consent-checkbox').addEventListener('change', function () {
+      const startButton = document.getElementById('start-btn');
+      // チェックボックスがチェックされた場合にボタンを有効化
+      startButton.disabled = !this.checked;
+    });
+
+    // 同意フォーム送信後に実験を開始
     document.getElementById('consent-form').addEventListener('submit', function (e) {
       e.preventDefault();
 
       if (document.getElementById('consent-checkbox').checked) {
-        document.getElementById('intro-page').style.display = 'none';  // 隐藏前置页面
-        document.getElementById('jspsych-target').style.display = 'block';  // 显示实验页面
+        document.getElementById('intro-page').style.display = 'none';  // 隠す前置页面
+        document.getElementById('jspsych-target').style.display = 'block';  // 表示实验页面
         startExperiment();  // 启动实验
       }
     });
@@ -65,7 +73,7 @@
     const database = firebase.database();
 
     function startExperiment() {
-      // ✅ jsPsych 初始化
+      // ✅ jsPsych 初期化
       const jsPsych = initJsPsych({
         display_element: 'jspsych-target',
         on_finish: function () {
