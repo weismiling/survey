@@ -2,74 +2,56 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ストループ課題</title>
   <script src="https://unpkg.com/jspsych@7.3.0"></script>
   <script src="https://unpkg.com/@jspsych/plugin-html-keyboard-response@1.1.2"></script>
   <link href="https://unpkg.com/jspsych@7.3.0/css/jspsych.css" rel="stylesheet" />
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      background-color: #f4f4f9;
-      margin: 0;
-      padding: 0;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-      flex-direction: column;
-    }
-    #jspsych-target {
-      display: none;  /* 默认隐藏实验页面 */
-      padding: 20px;
-      text-align: center;
-    }
-    .button {
-      padding: 15px 30px;
-      font-size: 18px;
-      cursor: pointer;
-      background-color: #4CAF50;
-      color: white;
-      border: none;
-      border-radius: 5px;
-      display: block;
-      margin: 20px auto;
-      transition: background-color 0.3s ease;
-    }
-    .button:hover {
-      background-color: #45a049;
-    }
-    .hidden {
-      display: none;
-    }
+    body { font-family: Arial, sans-serif; text-align: center; margin: 2em; background-color: #f5f5f5; }
+    #jspsych-target { margin-top: 30px; }
+    .intro-page { font-size: 18px; margin-top: 20px; }
+    .btn-start { padding: 10px 20px; font-size: 18px; cursor: pointer; background-color: #4CAF50; color: white; border: none; border-radius: 5px; }
   </style>
 </head>
 <body>
 
-  <!-- 前置同意页 -->
+  <!-- 预设问卷前置页面 -->
   <div id="intro-page">
-    <h2>ストループ課題実験</h2>
-    <p>この実験に参加する前に、同意をお願いします。</p>
+    <h1>ストループ課題へようこそ！</h1>
+    <p class="intro-page">この実験は、色と単語の反応時間を測定するものです。実験に参加することで、データ収集に協力することになります。</p>
+    <p class="intro-page">実験を開始する前に、以下の簡単な質問にお答えください。</p>
+
     <form id="consent-form">
-      <input type="checkbox" id="consent-checkbox">
-      <label for="consent-checkbox">私はこの実験に参加することに同意します。</label>
-      <br>
-      <button type="submit" id="start-btn" class="button" disabled>実験を始める</button>
+      <label>
+        <input type="checkbox" id="consent-checkbox" required>
+        私はこの実験に参加し、提供された情報が収集されることに同意します。
+      </label>
+      <br><br>
+      <button type="submit" class="btn-start" id="start-btn" disabled>実験開始</button>
     </form>
   </div>
 
-  <!-- jsPsych 実験内容 -->
-  <div id="jspsych-target"></div>
+  <!-- jsPsych 实验 -->
+  <div id="jspsych-target" style="display:none;"></div>
 
   <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/10.5.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.5.0/firebase-database-compat.js"></script>
 
   <script>
-    document.addEventListener('DOMContentLoaded', function() {
-      try {
-        // Firebase 設定 - ご自身の設定情報に置き換えてください
-      const firebaseConfig = {
+    // 初期化部分：等待用户同意后启动实验
+    document.getElementById('consent-form').addEventListener('submit', function (e) {
+      e.preventDefault();
+
+      if (document.getElementById('consent-checkbox').checked) {
+        document.getElementById('intro-page').style.display = 'none';  // 隐藏前置页面
+        document.getElementById('jspsych-target').style.display = 'block';  // 显示实验页面
+        startExperiment();  // 启动实验
+      }
+    });
+
+    // Firebase 配置
+    const firebaseConfig = {
       apiKey: "AIzaSyDnZtQ02sSWCajHWkAgoik1JEIUfxP011A",
       authDomain: "github-survey.firebaseapp.com",
       databaseURL: "https://github-survey-default-rtdb.firebaseio.com",
@@ -77,116 +59,91 @@
       storageBucket: "github-survey.appspot.com",
       messagingSenderId: "736836641989",
       appId: "1:736836641989:web:5fab88b6fc1dd0f519fcac"
-        };
-        firebase.initializeApp(firebaseConfig);
-        const database = firebase.database();
+    };
 
-        const startButton = document.getElementById('start-btn');
-        const consentCheckbox = document.getElementById('consent-checkbox');
+    firebase.initializeApp(firebaseConfig);
+    const database = firebase.database();
 
-        // 禁用按钮直到同意协议
-        startButton.disabled = true;
+    function startExperiment() {
+      // ✅ jsPsych 初始化
+      const jsPsych = initJsPsych({
+        display_element: 'jspsych-target',
+        on_finish: function () {
+          const data = jsPsych.data.get().filter({ trial_type: 'html-keyboard-response' }).values();
+          
+          const participantID = jsPsych.data.get().values()[0].participant_id || "unknown";
+          const filtered = data.map(trial => ({
+            participant_id: participantID,
+            word: trial.word || null,
+            color: trial.color || null,
+            congruent: trial.congruent || null,
+            rt: trial.rt || null,
+            key_press: trial.key_press !== undefined ? trial.key_press : null
+          }));
 
-        // 点击同意按钮后启用开始按钮
-        consentCheckbox.addEventListener('change', function() {
-          startButton.disabled = !this.checked;
-        });
-
-        // 提交表单后开始实验
-        document.getElementById('consent-form').addEventListener('submit', function(e) {
-          e.preventDefault();
-          if (consentCheckbox.checked) {
-            document.getElementById('intro-page').style.display = 'none';
-            document.getElementById('jspsych-target').style.display = 'block';
-            startExperiment();
-          } else {
-            alert('同意してから開始してください。');
-          }
-        });
-
-        // 实验开始
-        function startExperiment() {
-          const jsPsych = initJsPsych({
-            display_element: 'jspsych-target',  // 指定一个明确的目标元素
-            on_finish: function() {
-              const filteredData = jsPsych.data.get().filter({trial_type: 'html-keyboard-response'}).values();
-              const results = filteredData.map(trial => {
-                return {
-                  participant_id: trial.participant_id,
-                  word: trial.word,
-                  color: trial.color,
-                  congruent: trial.congruent,
-                  rt: trial.rt,
-                  key_press: trial.key_press || null
-                };
-              });
-
-              if (results.length > 0) {
-                const stroopRef = database.ref('stroop_results');
-                const newSessionRef = stroopRef.push();
-                newSessionRef.set(results).then(() => {
-                  console.log("データが正常に保存されました");
-                }).catch((error) => {
-                  console.error("データの保存中にエラーが発生しました:", error);
-                });
-              }
-
-              jsPsych.data.displayData();
-            }
-          });
-
-          const participantID = jsPsych.randomization.randomID(8);
-          const timeline = [];
-
-          timeline.push({
-            type: jsPsychHtmlKeyboardResponse,
-            stimulus: 'ストループ課題へようこそ。<br><br>スペースキーで開始します。',
-            choices: [' ']
-          });
-
-          const words = ['赤', '青', '緑'];
-          const colors = ['red', 'blue', 'green'];
-
-          function getJapaneseColorName(color) {
-            return { red: '赤', blue: '青', green: '緑' }[color];
+          if (filtered.length > 0) {
+            const ref = database.ref('stroop_results').push();
+            ref.set(filtered).then(() => {
+              console.log("データ送信成功！");
+            }).catch((error) => {
+              console.error("データ送信失敗:", error);
+            });
           }
 
-          let trials = [];
-          for (let rep = 0; rep < 2; rep++) {
-            for (let word of words) {
-              for (let color of colors) {
-                trials.push({
-                  type: jsPsychHtmlKeyboardResponse,
-                  stimulus: `<p style="font-size:48px; color:${color};">${word}</p>`,
-                  choices: ['r', 'g', 'b'],
-                  data: {
-                    participant_id: participantID,
-                    word: word,
-                    color: color,
-                    congruent: word === getJapaneseColorName(color) ? 'congruent' : 'incongruent'
-                  },
-                  trial_duration: 2000
-                });
-              }
-            }
-          }
-
-          timeline.push(...jsPsych.randomization.shuffle(trials));
-
-          timeline.push({
-            type: jsPsychHtmlKeyboardResponse,
-            stimulus: '終了しました。ご協力ありがとうございました。',
-            choices: 'NO_KEYS',
-            trial_duration: 2000
-          });
-
-          jsPsych.run(timeline);
+          jsPsych.endExperiment(`
+            <h2>ご協力ありがとうございました！</h2>
+            <p>データは正常に送信されました。</p>
+          `);
         }
-      } catch (error) {
-        console.error("初期化中にエラーが発生しました:", error);
-        document.body.innerHTML += `<div style="color:red; margin-top:20px;">エラーが発生しました: ${error.message}</div>`;
+      });
+
+      const participantID = jsPsych.randomization.randomID(8);
+      const timeline = [];
+
+      timeline.push({
+        type: jsPsychHtmlKeyboardResponse,
+        stimulus: 'ストループ課題へようこそ。<br><br>スペースキーで開始します。',
+        choices: [' ']
+      });
+
+      const words = ['赤', '青', '緑'];
+      const colors = ['red', 'blue', 'green'];
+
+      function getJapaneseColorName(color) {
+        return { red: '赤', blue: '青', green: '緑' }[color];
       }
-    });
+
+      let trials = [];
+      for (let rep = 0; rep < 2; rep++) {
+        for (let word of words) {
+          for (let color of colors) {
+            trials.push({
+              type: jsPsychHtmlKeyboardResponse,
+              stimulus: `<p style="font-size:48px; color:${color};">${word}</p>`,
+              choices: ['r', 'g', 'b'],
+              data: {
+                participant_id: participantID,
+                word: word,
+                color: color,
+                congruent: word === getJapaneseColorName(color) ? 'congruent' : 'incongruent'
+              },
+              response_ends_trial: true
+            });
+          }
+        }
+      }
+
+      timeline.push(...jsPsych.randomization.shuffle(trials));
+
+      timeline.push({
+        type: jsPsychHtmlKeyboardResponse,
+        stimulus: '終了しました。ご協力ありがとうございました。',
+        choices: 'NO_KEYS',
+        trial_duration: 2000
+      });
+
+      jsPsych.run(timeline);
+    }
   </script>
 </body>
 </html>
