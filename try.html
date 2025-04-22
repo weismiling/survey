@@ -15,7 +15,7 @@
 </head>
 <body>
 
-  <!-- 予備ページ -->
+  <!-- 前置ページ -->
   <div id="intro-page">
     <h1>ストループ課題へようこそ！</h1>
     <p class="intro-page">この実験は、色と単語の反応時間を測定するものです。実験に参加することで、データ収集に協力することになります。</p>
@@ -31,7 +31,7 @@
     </form>
   </div>
 
-  <!-- jsPsych 実験 -->
+  <!-- jsPsych -->
   <div id="jspsych-target" style="display:none;"></div>
 
   <!-- Firebase SDK -->
@@ -44,12 +44,15 @@
       document.getElementById('start-btn').disabled = !this.checked;
     });
 
-    // 初期化
+    // 同意フォーム
     document.getElementById('consent-form').addEventListener('submit', function (e) {
       e.preventDefault();
-      document.getElementById('intro-page').style.display = 'none';
-      document.getElementById('jspsych-target').style.display = 'block';
-      startExperiment();
+
+      if (document.getElementById('consent-checkbox').checked) {
+        document.getElementById('intro-page').style.display = 'none';
+        document.getElementById('jspsych-target').style.display = 'block';
+        startExperiment();
+      }
     });
 
     // Firebase 設定
@@ -66,15 +69,19 @@
     firebase.initializeApp(firebaseConfig);
     const database = firebase.database();
 
+    // グローバル participantID
+    let participantID = null;
+
     function startExperiment() {
+      participantID = jsPsych.randomization.randomID(8);
+
       const jsPsych = initJsPsych({
         display_element: 'jspsych-target',
         on_finish: function () {
           const data = jsPsych.data.get().filter({ trial_type: 'html-keyboard-response' }).values();
-          const participantID = jsPsych.data.get().values()[0].participant_id || "unknown";
 
           const filtered = data.map(trial => ({
-            participant_id: trial.participant_id || participantID,
+            participant_id: participantID,
             word: trial.word || null,
             color: trial.color || null,
             congruent: trial.congruent || null,
@@ -98,9 +105,9 @@
         }
       });
 
-      const participantID = jsPsych.randomization.randomID(8);
       const timeline = [];
 
+      // 開始画面
       timeline.push({
         type: jsPsychHtmlKeyboardResponse,
         stimulus: 'ストループ課題へようこそ。<br><br>スペースキーで開始します。',
@@ -123,6 +130,7 @@
               stimulus: `<p style="font-size:48px; color:${color};">${word}</p>`,
               choices: ['r', 'g', 'b'],
               data: {
+                participant_id: participantID,
                 word: word,
                 color: color,
                 congruent: word === getJapaneseColorName(color) ? 'congruent' : 'incongruent'
@@ -132,12 +140,6 @@
           }
         }
       }
-
-      // 🔧 修正：すべての trial に participant_id を追加
-      trials = trials.map(trial => {
-        trial.data.participant_id = participantID;
-        return trial;
-      });
 
       timeline.push(...jsPsych.randomization.shuffle(trials));
 
