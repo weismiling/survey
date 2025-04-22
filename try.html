@@ -15,7 +15,7 @@
 </head>
 <body>
 
-  <!-- 前置ページ -->
+  <!-- 预设问卷前置页面 -->
   <div id="intro-page">
     <h1>ストループ課題へようこそ！</h1>
     <p class="intro-page">この実験は、色と単語の反応時間を測定するものです。実験に参加することで、データ収集に協力することになります。</p>
@@ -31,7 +31,7 @@
     </form>
   </div>
 
-  <!-- jsPsych 実験本体 -->
+  <!-- jsPsych 实验 -->
   <div id="jspsych-target" style="display:none;"></div>
 
   <!-- Firebase SDK -->
@@ -39,7 +39,18 @@
   <script src="https://www.gstatic.com/firebasejs/10.5.0/firebase-database-compat.js"></script>
 
   <script>
-    // Firebase設定
+    // 初期化部分：等待用户同意后启动实验
+    document.getElementById('consent-form').addEventListener('submit', function (e) {
+      e.preventDefault();
+
+      if (document.getElementById('consent-checkbox').checked) {
+        document.getElementById('intro-page').style.display = 'none';  // 隐藏前置页面
+        document.getElementById('jspsych-target').style.display = 'block';  // 显示实验页面
+        startExperiment();  // 启动实验
+      }
+    });
+
+    // Firebase 配置
     const firebaseConfig = {
       apiKey: "AIzaSyDnZtQ02sSWCajHWkAgoik1JEIUfxP011A",
       authDomain: "github-survey.firebaseapp.com",
@@ -49,33 +60,20 @@
       messagingSenderId: "736836641989",
       appId: "1:736836641989:web:5fab88b6fc1dd0f519fcac"
     };
+
     firebase.initializeApp(firebaseConfig);
     const database = firebase.database();
 
-    // チェックボックスがチェックされたらボタン有効化
-    document.getElementById('consent-checkbox').addEventListener('change', function () {
-      document.getElementById('start-btn').disabled = !this.checked;
-    });
-
-    // 同意後に実験スタート
-    document.getElementById('consent-form').addEventListener('submit', function (e) {
-      e.preventDefault();
-      if (document.getElementById('consent-checkbox').checked) {
-        document.getElementById('intro-page').style.display = 'none';
-        document.getElementById('jspsych-target').style.display = 'block';
-        startExperiment();
-      }
-    });
-
     function startExperiment() {
+      // ✅ jsPsych 初始化
       const jsPsych = initJsPsych({
         display_element: 'jspsych-target',
         on_finish: function () {
-          const all_data = jsPsych.data.get().filter({ trial_type: 'html-keyboard-response' }).values();
-          const participantID = jsPsych.data.get().first(1).values()[0].participant_id || "unknown";
-
-          const filtered = all_data.map(trial => ({
-            participant_id: trial.participant_id || participantID,
+          const data = jsPsych.data.get().filter({ trial_type: 'html-keyboard-response' }).values();
+          
+          const participantID = jsPsych.data.get().values()[0].participant_id || "unknown";
+          const filtered = data.map(trial => ({
+            participant_id: participantID,
             word: trial.word || null,
             color: trial.color || null,
             congruent: trial.congruent || null,
@@ -102,7 +100,6 @@
       const participantID = jsPsych.randomization.randomID(8);
       const timeline = [];
 
-      // 開始画面
       timeline.push({
         type: jsPsychHtmlKeyboardResponse,
         stimulus: 'ストループ課題へようこそ。<br><br>スペースキーで開始します。',
@@ -138,7 +135,6 @@
 
       timeline.push(...jsPsych.randomization.shuffle(trials));
 
-      // 終了メッセージ
       timeline.push({
         type: jsPsychHtmlKeyboardResponse,
         stimulus: '終了しました。ご協力ありがとうございました。',
